@@ -475,6 +475,10 @@ class SpeechServer(speechserver.SpeechServer):
 
         name = character
         if not name or name == character:
+            # Both branches below bypass speak(), where speech_emitted
+            # otherwise fires; without this, subscribers never see
+            # characters spoken while typing or moving by character.
+            self._emit_speech_emitted(character, acss)
             if cap_style == CapitalizationStyle.ICON:
                 # char() does not reliably trigger the icon sound whereas
                 # speak() does. See https://gitlab.gnome.org/GNOME/orca/-/issues/657
@@ -508,6 +512,7 @@ class SpeechServer(speechserver.SpeechServer):
         if len(event_string) == 1:
             msg = f"SPEECH DISPATCHER: Speaking '{event_string}' as char"
             debug.print_message(debug.LEVEL_INFO, msg, True)
+            self._emit_speech_emitted(event_string, acss)
             self._apply_acss(acss)
             if self._client is not None:
                 self._send_command(self._client.char, event_string)
