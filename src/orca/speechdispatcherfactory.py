@@ -320,32 +320,6 @@ class SpeechServer(speechserver.SpeechServer):
         if self._client is not None:
             self._send_command(self._client.speak, ssml, **kwargs)
 
-    def _emit_speech_emitted(
-        self, text: str, acss: dict[str, Any] | None,
-    ) -> None:
-        """Hand text off to any speech_emitted subscribers.
-
-        Wrapped in a broad except so a misbehaving subscriber can
-        never interfere with the local speech that follows.
-        """
-
-        try:
-            from . import dbus_service  # pylint: disable=import-outside-toplevel
-            controller = dbus_service.get_remote_controller()
-            if controller is None:
-                return
-            language = ""
-            if acss:
-                family = acss.get(ACSS.FAMILY) or {}
-                if isinstance(family, dict):
-                    lang = family.get("lang", "") or ""
-                    dialect = family.get("dialect", "") or ""
-                    language = f"{lang}-{dialect}" if (lang and dialect) else lang
-            controller.emit_speech_emitted(text, "", language)
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            msg = f"SPEECH DISPATCHER: _emit_speech_emitted failed: {error}"
-            debug.print_message(debug.LEVEL_WARNING, msg, True)
-
     def _say_all(
         self,
         iterator: Iterator[tuple[speechserver.SayAllContext, dict[str, Any]]],
@@ -390,6 +364,7 @@ class SpeechServer(speechserver.SpeechServer):
                 if t == speechserver.SayAllContext.COMPLETED:
                     GLib.idle_add(self._say_all, iterator, orca_callback)
 
+            self._emit_speech_emitted(context.utterance, acss)
             self._speak(
                 context.utterance,
                 acss,
